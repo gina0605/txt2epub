@@ -1,0 +1,9 @@
+node_modules
+dist
+.DS_Store
+
+# 예시 소설 파일 (저작권)
+examples/
+
+# 로컬 미리보기 설정
+.claude/

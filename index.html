@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>txt2epub</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>txt → epub</h1>
+        <p class="sub">파일은 서버로 전송되지 않고 이 브라우저 안에서만 변환됩니다.</p>
+      </header>
+
+      <label id="drop" class="drop">
+        <input id="txt-input" type="file" accept=".txt,text/plain" hidden />
+        <strong>txt 파일을 끌어다 놓거나 클릭해서 선택</strong>
+        <span id="drop-info" class="muted">첫 줄은 책 제목으로 사용됩니다</span>
+      </label>
+
+      <section id="editor" hidden>
+        <div class="meta">
+          <label class="cover" id="cover-box" title="표지 이미지 선택">
+            <input id="cover-input" type="file" accept="image/*" hidden />
+            <img id="cover-img" alt="" hidden />
+            <span id="cover-placeholder">표지 이미지<br />선택</span>
+          </label>
+          <div class="fields">
+            <label>제목 <input id="title" type="text" /></label>
+            <label>저자 <input id="author" type="text" placeholder="선택 사항" /></label>
+            <label
+              >인코딩
+              <select id="encoding">
+                <option value="auto">자동 감지</option>
+                <option value="utf-8">UTF-8</option>
+                <option value="euc-kr">EUC-KR (CP949)</option>
+                <option value="utf-16le">UTF-16 LE</option>
+                <option value="utf-16be">UTF-16 BE</option>
+              </select>
+            </label>
+            <p id="file-stats" class="muted"></p>
+            <button id="cover-remove" type="button" class="link" hidden>표지 제거</button>
+          </div>
+        </div>
+
+        <div class="chapters">
+          <div class="chapters-head">
+            <h2 id="chapter-count">챕터</h2>
+            <div class="row">
+              <button id="select-all" type="button" class="link">전체 선택</button>
+              <button id="select-none" type="button" class="link">전체 해제</button>
+            </div>
+          </div>
+          <form id="pattern-form" class="row">
+            <input id="pattern" type="text" placeholder="직접 패턴 입력 (정규식, 비우면 자동 인식) 예: ^제\d+화" />
+            <button type="submit">적용</button>
+          </form>
+          <p class="muted hint">체크를 해제한 줄은 챕터 제목이 아니라 앞 챕터의 본문으로 들어갑니다. 흐린 항목은 형식은 맞지만 번호 순서가 맞지 않아 제외된 후보입니다.</p>
+          <ol id="chapter-list"></ol>
+        </div>
+
+        <div class="actions">
+          <button id="build" type="button" class="primary">EPUB 만들기</button>
+          <span id="status" class="muted"></span>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

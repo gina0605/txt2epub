@@ -1,0 +1,262 @@
+:root {
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --text: #1f1f1f;
+  --muted: #6b6b6b;
+  --border: #dedbd5;
+  --accent: #2f6f5e;
+  --accent-text: #ffffff;
+  --hover: #efede8;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161616;
+    --surface: #202020;
+    --text: #ececec;
+    --muted: #9a9a9a;
+    --border: #383838;
+    --accent: #5fb39b;
+    --accent-text: #0d1f1a;
+    --hover: #2a2a2a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.sub,
+.muted {
+  color: var(--muted);
+}
+
+.sub {
+  margin: 4px 0 24px;
+}
+
+input[type='text'],
+select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+button {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button {
+  white-space: nowrap;
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+}
+
+button.primary {
+  padding: 10px 22px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 16px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop.over {
+  border-color: var(--accent);
+}
+
+#editor {
+  margin-top: 24px;
+}
+
+.meta {
+  display: flex;
+  gap: 20px;
+}
+
+.cover {
+  flex: 0 0 140px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.fields p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.fields .link {
+  align-self: flex-start;
+  font-size: 13px;
+}
+
+.chapters {
+  margin-top: 28px;
+}
+
+.chapters-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.hint {
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+#chapter-list {
+  max-height: 420px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+#chapter-list li > label,
+#chapter-list li.muted {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 12px;
+}
+
+#chapter-list li > label {
+  cursor: pointer;
+}
+
+#chapter-list li > label:hover {
+  background: var(--hover);
+}
+
+#chapter-list li.rejected {
+  opacity: 0.5;
+}
+
+#chapter-list .text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#chapter-list .line {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 20px;
+}
+
+@media (max-width: 520px) {
+  .meta {
+    flex-direction: column;
+  }
+
+  .cover {
+    flex-basis: auto;
+    width: 140px;
+  }
+}
