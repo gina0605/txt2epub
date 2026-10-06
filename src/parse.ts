@@ -6,6 +6,8 @@ export interface Candidate {
   num: number | null;
   /** 자동 인식 결과 챕터로 채택되었는지 */
   accepted: boolean;
+  /** EPUB 입력에서, 원본 목차와 별개로 자동 인식이 챕터로 판단했는지 */
+  auto?: boolean;
 }
 
 export interface Section {

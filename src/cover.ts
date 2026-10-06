@@ -5,7 +5,7 @@ const MAX_WIDTH = 1600;
 const MAX_HEIGHT = 2560;
 
 /** 어떤 형식의 이미지든 JPEG로 바꾸고 너무 크면 줄인다. (EPUB 리더 호환성이 가장 좋은 형식) */
-export async function prepareCover(file: File): Promise<Cover & { blob: Blob }> {
+export async function prepareCover(file: Blob): Promise<Cover & { blob: Blob }> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, MAX_WIDTH / bitmap.width, MAX_HEIGHT / bitmap.height);
   const width = Math.round(bitmap.width * scale);

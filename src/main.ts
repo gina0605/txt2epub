@@ -12,6 +12,7 @@ const dropInfo = $('drop-info');
 const editor = $('editor');
 const titleInput = $<HTMLInputElement>('title');
 const authorInput = $<HTMLInputElement>('author');
+const encodingField = $('encoding-field');
 const encodingSelect = $<HTMLSelectElement>('encoding');
 const fileStats = $('file-stats');
 const coverInput = $<HTMLInputElement>('cover-input');
@@ -22,6 +23,8 @@ const chapterCount = $('chapter-count');
 const chapterList = $<HTMLOListElement>('chapter-list');
 const patternForm = $<HTMLFormElement>('pattern-form');
 const patternInput = $<HTMLInputElement>('pattern');
+const epubNote = $('epub-note');
+const selectAuto = $<HTMLButtonElement>('select-auto');
 const buildButton = $<HTMLButtonElement>('build');
 const status = $('status');
 
@@ -29,6 +32,8 @@ const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'modu
 
 let file: File | null = null;
 let cover: (Cover & { blob: Blob }) | null = null;
+// EPUB 입력에서 사용자가 표지를 바꾸거나 지웠는지
+let coverChanged = false;
 let candidates: Candidate[] = [];
 const selected = new Set<number>();
 
@@ -74,6 +79,7 @@ function setCandidates(list: Candidate[]) {
 }
 
 async function loadFile(f: File, encoding: Encoding = 'auto') {
+  if (f !== file) clearCover();
   file = f;
   dropInfo.textContent = `${f.name} (${formatSize(f.size)})`;
   setBusy('파일 읽는 중...');
@@ -84,17 +90,25 @@ async function loadFile(f: File, encoding: Encoding = 'auto') {
 worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
   const msg = e.data;
   switch (msg.type) {
-    case 'loaded':
+    case 'loaded': {
+      const isEpub = msg.kind === 'epub';
       editor.hidden = false;
       titleInput.value = msg.title;
-      if (encodingSelect.value === 'auto') {
+      authorInput.value = msg.author;
+      encodingField.hidden = isEpub;
+      epubNote.hidden = !isEpub;
+      selectAuto.hidden = !isEpub;
+      if (msg.encoding && encodingSelect.value === 'auto') {
         encodingSelect.options[0].textContent = `자동 감지 (${msg.encoding.toUpperCase()})`;
       }
-      fileStats.textContent = `${msg.lineCount.toLocaleString()}줄 · ${msg.charCount.toLocaleString()}자`;
+      fileStats.textContent = `${isEpub ? 'EPUB · ' : ''}${msg.lineCount.toLocaleString()}줄 · ${msg.charCount.toLocaleString()}자`;
       patternInput.value = '';
+      patternInput.placeholder = `직접 패턴 입력 (정규식, 비우면 ${isEpub ? '원래 목차' : '자동 인식'}) 예: ^제\\d+화`;
       setCandidates(msg.candidates);
+      if (msg.cover) setCover(new Blob([msg.cover.data], { type: msg.cover.mediaType }), false);
       setBusy('');
       break;
+    }
     case 'detected':
       setCandidates(msg.candidates);
       setBusy('');
@@ -107,7 +121,10 @@ worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
       setBusy('');
-      status.textContent = `완료 (${formatSize(blob.size)})`;
+      status.textContent =
+        msg.mode === 'patched'
+          ? `완료 (${formatSize(blob.size)}) · 원본 본문 유지, 정보와 표지만 수정`
+          : `완료 (${formatSize(blob.size)})`;
       break;
     }
     case 'error':
@@ -151,13 +168,14 @@ encodingSelect.addEventListener('change', () => {
   if (file) loadFile(file, encodingSelect.value as Encoding);
 });
 
-async function setCover(f: File) {
+async function setCover(image: Blob, changed = true) {
   try {
-    cover = await prepareCover(f);
+    cover = await prepareCover(image);
   } catch {
-    status.textContent = '이미지를 읽을 수 없습니다.';
+    if (changed) status.textContent = '이미지를 읽을 수 없습니다.';
     return;
   }
+  coverChanged ||= changed;
   if (coverImg.src) URL.revokeObjectURL(coverImg.src);
   coverImg.src = URL.createObjectURL(cover.blob);
   coverImg.hidden = false;
@@ -171,13 +189,19 @@ coverInput.addEventListener('change', () => {
   coverInput.value = '';
 });
 
-coverRemove.addEventListener('click', () => {
+function clearCover() {
   cover = null;
-  URL.revokeObjectURL(coverImg.src);
+  coverChanged = false;
+  if (coverImg.src) URL.revokeObjectURL(coverImg.src);
   coverImg.removeAttribute('src');
   coverImg.hidden = true;
   coverPlaceholder.hidden = false;
   coverRemove.hidden = true;
+}
+
+coverRemove.addEventListener('click', () => {
+  clearCover();
+  coverChanged = true;
 });
 
 chapterList.addEventListener('change', (e) => {
@@ -188,6 +212,11 @@ chapterList.addEventListener('change', (e) => {
   chapterCount.textContent = `챕터 ${selected.size}개`;
 });
 
+selectAuto.addEventListener('click', () => {
+  selected.clear();
+  for (const c of candidates) if (c.auto) selected.add(c.line);
+  renderChapters();
+});
 $('select-all').addEventListener('click', () => {
   for (const c of candidates) selected.add(c.line);
   renderChapters();
@@ -220,7 +249,8 @@ buildButton.addEventListener('click', () => {
       title: titleInput.value,
       author: authorInput.value,
       headingLines: [...selected],
-      cover: coverCopy,
+      cover: coverCopy ?? null,
+      coverChanged,
     },
     coverCopy ? [coverCopy.data.buffer] : [],
   );

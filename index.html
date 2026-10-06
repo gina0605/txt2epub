@@ -14,9 +14,9 @@
       </header>
 
       <label id="drop" class="drop">
-        <input id="txt-input" type="file" accept=".txt,text/plain" hidden />
-        <strong>txt 파일을 끌어다 놓거나 클릭해서 선택</strong>
-        <span id="drop-info" class="muted">첫 줄은 책 제목으로 사용됩니다</span>
+        <input id="txt-input" type="file" accept=".txt,.epub,text/plain,application/epub+zip" hidden />
+        <strong>txt 또는 epub 파일을 끌어다 놓거나 클릭해서 선택</strong>
+        <span id="drop-info" class="muted">txt는 첫 줄이 책 제목으로 사용됩니다. epub은 표지·제목·챕터를 고칠 수 있습니다.</span>
       </label>
 
       <section id="editor" hidden>
@@ -29,7 +29,7 @@
           <div class="fields">
             <label>제목 <input id="title" type="text" /></label>
             <label>저자 <input id="author" type="text" placeholder="선택 사항" /></label>
-            <label
+            <label id="encoding-field"
               >인코딩
               <select id="encoding">
                 <option value="auto">자동 감지</option>
@@ -48,6 +48,7 @@
           <div class="chapters-head">
             <h2 id="chapter-count">챕터</h2>
             <div class="row">
+              <button id="select-auto" type="button" class="link" hidden>자동 인식 결과로 선택</button>
               <button id="select-all" type="button" class="link">전체 선택</button>
               <button id="select-none" type="button" class="link">전체 해제</button>
             </div>
@@ -56,7 +57,11 @@
             <input id="pattern" type="text" placeholder="직접 패턴 입력 (정규식, 비우면 자동 인식) 예: ^제\d+화" />
             <button type="submit">적용</button>
           </form>
-          <p class="muted hint">체크를 해제한 줄은 챕터 제목이 아니라 앞 챕터의 본문으로 들어갑니다. 흐린 항목은 형식은 맞지만 번호 순서가 맞지 않아 제외된 후보입니다.</p>
+          <p id="epub-note" class="note" hidden>
+            챕터 선택을 원래 목차 그대로 두면 원본 EPUB의 본문·서식·이미지는 유지하고 제목, 저자, 표지만 바꿉니다.
+            챕터를 바꾸면 본문을 텍스트로 꺼내 새로 만들기 때문에 원본의 서식과 이미지는 사라집니다.
+          </p>
+          <p class="muted hint">체크를 해제한 줄은 챕터 제목이 아니라 앞 챕터의 본문으로 들어갑니다. 흐린 항목은 챕터 후보이지만 처음에 선택되지 않은 줄입니다.</p>
           <ol id="chapter-list"></ol>
         </div>
 

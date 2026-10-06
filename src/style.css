@@ -27,6 +27,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -189,9 +193,19 @@ button:disabled {
 
 .chapters-head {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.note {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--hover);
+  font-size: 13px;
 }
 
 .hint {
