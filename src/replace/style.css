@@ -1,0 +1,285 @@
+:root {
+  --del: #b3261e;
+  --del-bg: #fbe4e2;
+  --ins: #1d6b3a;
+  --ins-bg: #dff3e5;
+  --error: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --del: #ff9a8f;
+    --del-bg: #4a1f1b;
+    --ins: #8be0a5;
+    --ins-bg: #1b3d26;
+    --error: #ff9a8f;
+  }
+}
+
+code,
+.rule input[type='text'] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'D2Coding', monospace;
+}
+
+.rules {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 20px;
+}
+
+.list-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+#rule-list {
+  margin: 14px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.rule {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.rule.off .find,
+.rule.off .replace {
+  opacity: 0.45;
+}
+
+.rule.invalid .find {
+  border-color: var(--error);
+}
+
+.rule .error {
+  grid-column: 2 / -1;
+  margin: 0;
+  color: var(--error);
+  font-size: 12px;
+}
+
+.rule .error:empty {
+  display: none;
+}
+
+.rule .arrow {
+  color: var(--muted);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 40px;
+  cursor: pointer;
+}
+
+.flags,
+.ops {
+  display: flex;
+  gap: 2px;
+}
+
+.flag {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  font: 13px ui-monospace, monospace;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ops button {
+  padding: 4px 8px;
+  color: var(--muted);
+}
+
+#rule-list .empty {
+  padding: 8px 0;
+}
+
+.rule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rule-actions .row {
+  gap: 16px;
+}
+
+.link-button {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.help {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.help summary {
+  cursor: pointer;
+}
+
+.help ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.help li {
+  margin: 4px 0;
+}
+
+.file-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.inline-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.inline-field select {
+  width: auto;
+}
+
+.result {
+  margin-top: 24px;
+}
+
+.result-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.result > p {
+  margin: 6px 0 12px;
+  font-size: 13px;
+}
+
+#result-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+#result-list > li + li {
+  border-top: 1px solid var(--border);
+}
+
+#result-list summary,
+#result-list .summary {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 12px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+#result-list summary {
+  cursor: pointer;
+}
+
+#result-list summary:hover {
+  background: var(--hover);
+}
+
+#result-list code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+#result-list .zero {
+  opacity: 0.5;
+}
+
+#result-list .count {
+  flex: none;
+  min-width: 64px;
+  font-weight: 600;
+}
+
+.num {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.samples {
+  margin: 0;
+  padding: 4px 12px 10px 36px;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.samples li {
+  padding: 2px 0;
+}
+
+del {
+  color: var(--del);
+  background: var(--del-bg);
+}
+
+ins {
+  color: var(--ins);
+  background: var(--ins-bg);
+  text-decoration: none;
+}
+
+.nl {
+  color: var(--muted);
+}
+
+@media (max-width: 620px) {
+  .list-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .rule {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rule .find,
+  .rule .replace {
+    grid-column: 2 / -1;
+  }
+
+  .rule .arrow {
+    display: none;
+  }
+
+  .rule .flags {
+    grid-column: 2;
+  }
+}

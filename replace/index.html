@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>텍스트 대치</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/replace/style.css" />
+  </head>
+  <body>
+    <main>
+      <header class="page-head">
+        <div>
+          <h1>텍스트 대치</h1>
+          <p class="sub">txt·epub 파일의 글자를 정규식 목록으로 한꺼번에 바꿉니다. 파일은 서버로 전송되지 않습니다.</p>
+        </div>
+        <a class="nav" href="../">txt → epub</a>
+      </header>
+
+      <section class="rules">
+        <div class="list-bar">
+          <select id="list-select" aria-label="대치 목록"></select>
+          <input id="list-name" type="text" aria-label="목록 이름" placeholder="목록 이름" />
+          <div class="row">
+            <button id="list-new" type="button">새 목록</button>
+            <button id="list-copy" type="button">복제</button>
+            <button id="list-delete" type="button">삭제</button>
+          </div>
+        </div>
+
+        <ol id="rule-list"></ol>
+
+        <div class="rule-actions">
+          <button id="rule-add" type="button">+ 규칙 추가</button>
+          <div class="row">
+            <button id="export-one" type="button" class="link">이 목록 내보내기</button>
+            <button id="export-all" type="button" class="link">모든 목록 내보내기</button>
+            <label class="link-button">
+              가져오기
+              <input id="import-input" type="file" accept=".json,application/json" hidden />
+            </label>
+          </div>
+        </div>
+        <p id="save-status" class="note" hidden></p>
+        <details class="help">
+          <summary>사용법</summary>
+          <ul>
+            <li>위에서부터 차례로 적용됩니다. 앞 규칙이 바꾼 결과에 다음 규칙이 적용됩니다.</li>
+            <li>찾을 내용은 JavaScript 정규식입니다. 모든 매치를 바꾸며(<code>g</code>), <code>^</code>와 <code>$</code>는 줄의 처음과 끝입니다(<code>m</code>).
+              <code>i</code>는 대소문자 무시, <code>s</code>는 <code>.</code>이 줄바꿈도 포함하게 합니다.</li>
+            <li>바꿀 내용에서 <code>$1</code>, <code>$&lt;이름&gt;</code>, <code>$&amp;</code>(매치 전체), <code>$$</code>(<code>$</code> 문자)를 쓸 수 있습니다.
+              <code>\n</code>은 줄바꿈, <code>\t</code>는 탭, <code>\\</code>는 역슬래시입니다.</li>
+            <li>EPUB은 본문과 목차의 글자만 바꾸고 태그·서식·이미지는 그대로 둡니다. 다만 <code>&lt;b&gt;</code> 같은 태그로 나뉜 글자에 걸친 매치는 찾지 못합니다.</li>
+            <li>목록은 이 브라우저에 자동 저장됩니다. 사이트 데이터를 지우거나 사생활 보호 모드를 쓰면 사라질 수 있고,
+              Safari는 7일 이상 방문하지 않은 사이트의 저장 데이터를 지우기도 합니다. 중요한 목록은 파일로 내보내 두세요.</li>
+          </ul>
+        </details>
+      </section>
+
+      <label id="drop" class="drop">
+        <input id="file-input" type="file" accept=".txt,.epub,text/plain,application/epub+zip" hidden />
+        <strong>txt 또는 epub 파일을 끌어다 놓거나 클릭해서 선택</strong>
+        <span id="drop-info" class="muted">수십 MB 파일도 브라우저 안에서 처리합니다.</span>
+      </label>
+
+      <div id="file-bar" class="file-bar" hidden>
+        <span id="file-stats" class="muted"></span>
+        <label id="encoding-field" class="inline-field"
+          >인코딩
+          <select id="encoding">
+            <option value="auto">자동 감지</option>
+            <option value="utf-8">UTF-8</option>
+            <option value="euc-kr">EUC-KR (CP949)</option>
+            <option value="utf-16le">UTF-16 LE</option>
+            <option value="utf-16be">UTF-16 BE</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="run" type="button" class="primary" disabled>대치 실행</button>
+        <button id="cancel" type="button" hidden>중지</button>
+        <span id="status" class="muted"></span>
+      </div>
+
+      <section id="result" class="result" hidden>
+        <div class="result-head">
+          <h2 id="result-title">결과</h2>
+          <button id="download" type="button" class="primary">다운로드</button>
+        </div>
+        <p id="result-note" class="muted"></p>
+        <ol id="result-list"></ol>
+      </section>
+    </main>
+    <script type="module" src="/src/replace/main.ts"></script>
+  </body>
+</html>

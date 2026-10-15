@@ -63,6 +63,20 @@ h2 {
   margin: 4px 0 24px;
 }
 
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.nav {
+  flex: none;
+  margin-top: 6px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
 input[type='text'],
 select {
   width: 100%;
