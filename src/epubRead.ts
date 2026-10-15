@@ -46,7 +46,7 @@ export function decodeEntities(s: string): string {
   });
 }
 
-function attrs(tag: string): Record<string, string> {
+export function attrs(tag: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const m of tag.matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
     out[m[1].toLowerCase()] = decodeEntities(m[2] ?? m[3]);
@@ -54,13 +54,13 @@ function attrs(tag: string): Record<string, string> {
   return out;
 }
 
-function dirOf(path: string): string {
+export function dirOf(path: string): string {
   const i = path.lastIndexOf('/');
   return i < 0 ? '' : path.slice(0, i + 1);
 }
 
 /** base 디렉터리 기준으로 상대 경로를 ZIP 안의 전체 경로로 바꾼다. #fragment는 버린다. */
-function resolvePath(base: string, href: string): string {
+export function resolvePath(base: string, href: string): string {
   let decoded = href.split('#')[0];
   try {
     decoded = decodeURIComponent(decoded);
@@ -119,8 +119,19 @@ function readToc(files: Record<string, Uint8Array>, nav?: ManifestItem, ncx?: Ma
   return toc;
 }
 
-export function readEpub(bytes: Uint8Array): EpubBook {
-  const files = unzipSync(bytes);
+interface PackageInfo {
+  opfPath: string;
+  opf: string;
+  packageTag: string;
+  items: Map<string, ManifestItem>;
+  all: ManifestItem[];
+  /** 스파인 순서의 문서 (manifest에 없는 항목은 뺌) */
+  spine: ManifestItem[];
+  nav?: ManifestItem;
+  ncx?: ManifestItem;
+}
+
+function readPackage(files: Record<string, Uint8Array>): PackageInfo {
   const container = files['META-INF/container.xml'];
   if (!container) throw new Error('EPUB 파일이 아니거나 손상되었습니다. (container.xml 없음)');
   const rootfile = /<rootfile\b[^>]*>/i.exec(strFromU8(container));
@@ -129,7 +140,6 @@ export function readEpub(bytes: Uint8Array): EpubBook {
 
   const opf = strFromU8(files[opfPath]);
   const base = dirOf(opfPath);
-  const packageTag = /<(?:[\w-]+:)?package\b[^>]*>/i.exec(opf)?.[0] ?? '';
 
   const items = new Map<string, ManifestItem>();
   for (const m of opf.matchAll(/<(?:[\w-]+:)?item\b[^>]*>/gi)) {
@@ -145,15 +155,82 @@ export function readEpub(bytes: Uint8Array): EpubBook {
   }
   const all = [...items.values()];
 
+  const spineTag = /<(?:[\w-]+:)?spine\b[^>]*>/i.exec(opf)?.[0] ?? '';
+  const spine = [...opf.matchAll(/<(?:[\w-]+:)?itemref\b[^>]*>/gi)]
+    .map((m) => items.get(attrs(m[0]).idref ?? ''))
+    .filter((i): i is ManifestItem => i !== undefined);
+
+  return {
+    opfPath,
+    opf,
+    packageTag: /<(?:[\w-]+:)?package\b[^>]*>/i.exec(opf)?.[0] ?? '',
+    items,
+    all,
+    spine,
+    nav: all.find((i) => i.properties.includes('nav')),
+    ncx: items.get(attrs(spineTag).toc ?? '') ?? all.find((i) => i.mediaType === 'application/x-dtbncx+xml'),
+  };
+}
+
+/** 스파인에 있는 본문 문서인지 (목차 문서 제외) */
+function isContentDoc(files: Record<string, Uint8Array>, pkg: PackageInfo, item: ManifestItem): boolean {
+  return item !== pkg.nav && Boolean(files[item.path]) && /x?html/.test(item.mediaType);
+}
+
+export interface EpubChapter {
+  title: string;
+  /** 이 챕터에 속한 본문 문서들의 ZIP 안 경로 (스파인 순서) */
+  paths: string[];
+}
+
+export interface EpubChapters {
+  chapters: EpubChapter[];
+  navPath?: string;
+  ncxPath?: string;
+}
+
+/**
+ * 목차를 기준으로 본문 문서를 챕터로 묶는다. 목차 항목이 가리키는 문서부터 다음 항목 전까지가 한 챕터다.
+ * 첫 목차 항목 앞의 문서(표지, 속표지 등)는 "목차 앞부분"으로 묶는다.
+ * 한 문서 안을 #으로 나눈 목차 항목은 구분하지 못하고 그 문서의 첫 항목에 합친다.
+ */
+export function readChapters(files: Record<string, Uint8Array>): EpubChapters {
+  const pkg = readPackage(files);
+  const tocByPath = new Map<string, string>();
+  for (const t of readToc(files, pkg.nav, pkg.ncx)) {
+    if (!tocByPath.has(t.path)) tocByPath.set(t.path, t.title);
+  }
+
+  const chapters: EpubChapter[] = [];
+  const seen = new Set<string>();
+  for (const item of pkg.spine) {
+    if (!isContentDoc(files, pkg, item) || seen.has(item.path)) continue;
+    seen.add(item.path);
+    const title = tocByPath.get(item.path);
+    if (title !== undefined) {
+      chapters.push({ title: title || item.path.split('/').pop()!, paths: [item.path] });
+    } else if (!tocByPath.size) {
+      // 목차가 없으면 문서 하나를 챕터 하나로 본다
+      chapters.push({ title: item.path.split('/').pop()!, paths: [item.path] });
+    } else if (chapters.length) {
+      chapters[chapters.length - 1].paths.push(item.path);
+    } else {
+      chapters.push({ title: '(목차 앞부분)', paths: [item.path] });
+    }
+  }
+  return { chapters, navPath: pkg.nav?.path, ncxPath: pkg.ncx?.path };
+}
+
+export function readEpub(bytes: Uint8Array): EpubBook {
+  const files = unzipSync(bytes);
+  const pkg = readPackage(files);
+  const { opfPath, opf, items, all, nav, ncx } = pkg;
+
   const coverMetaId = attrs(/<(?:[\w-]+:)?meta\b[^>]*name\s*=\s*["']cover["'][^>]*>/i.exec(opf)?.[0] ?? '').content;
   const coverItem =
     all.find((i) => i.properties.includes('cover-image')) ??
     (coverMetaId ? items.get(coverMetaId) : undefined) ??
     all.find((i) => i.mediaType.startsWith('image/') && /cover/i.test(i.id + i.path));
-
-  const spineTag = /<(?:[\w-]+:)?spine\b[^>]*>/i.exec(opf)?.[0] ?? '';
-  const nav = all.find((i) => i.properties.includes('nav'));
-  const ncx = items.get(attrs(spineTag).toc ?? '') ?? all.find((i) => i.mediaType === 'application/x-dtbncx+xml');
 
   const tocByPath = new Map<string, string>();
   for (const t of readToc(files, nav, ncx)) {
@@ -163,9 +240,8 @@ export function readEpub(bytes: Uint8Array): EpubBook {
   // 스파인 순서대로 문서를 텍스트로 펼친다. 목차에 있는 문서의 시작 줄을 챕터 제목으로 표시한다.
   const lines: string[] = [];
   const headingLines: number[] = [];
-  for (const m of opf.matchAll(/<(?:[\w-]+:)?itemref\b[^>]*>/gi)) {
-    const item = items.get(attrs(m[0]).idref ?? '');
-    if (!item || item === nav || !files[item.path] || !/x?html/.test(item.mediaType)) continue;
+  for (const item of pkg.spine) {
+    if (!isContentDoc(files, pkg, item)) continue;
 
     const docLines = splitLines(htmlToText(strFromU8(files[item.path])));
     while (docLines.length && !docLines[docLines.length - 1].trim()) docLines.pop();
@@ -185,7 +261,7 @@ export function readEpub(bytes: Uint8Array): EpubBook {
     files,
     opfPath,
     opf,
-    version: attrs(packageTag).version ?? '2.0',
+    version: attrs(pkg.packageTag).version ?? '2.0',
     title: textOf(opf, 'dc:title'),
     author: textOf(opf, 'dc:creator'),
     language: textOf(opf, 'dc:language') || 'ko',

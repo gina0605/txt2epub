@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, zipSync, type Zippable } from 'fflate';
-import { decodeEntities } from '../epubRead';
+import { attrs, decodeEntities, dirOf, resolvePath } from '../epubRead';
 
 /** 대치 규칙 하나. flags에는 g, m을 제외한 추가 플래그(i, s, u)만 담는다. */
 export interface RuleSpec {
@@ -187,16 +187,37 @@ function escapeText(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** 목차 문서에서 이 경로들을 가리키는 항목의 글자만 바꾸도록 제한한다 */
+export interface LinkScope {
+  /** ZIP 안 경로 */
+  targets: Set<string>;
+  /** 목차 문서가 있는 폴더 (href를 ZIP 안 경로로 바꿀 때 기준) */
+  base: string;
+}
+
 /**
  * XHTML은 body 안(script, style 제외), NCX는 <text> 안의 글자에만 규칙을 적용한다.
  * 태그와 속성은 건드리지 않으며, 태그로 나뉜 글자에 걸친 매치는 찾지 못한다.
+ * links를 주면 목차 문서로 보고 그 경로를 가리키는 <a>나 navPoint의 글자만 바꾼다.
  */
-export function applyToMarkup(src: string, kind: 'html' | 'ncx', rules: CompiledRule[], results: RuleResult[]): string {
+export function applyToMarkup(
+  src: string,
+  kind: 'html' | 'ncx',
+  rules: CompiledRule[],
+  results: RuleResult[],
+  links?: LinkScope,
+): string {
   const out: string[] = [];
   let last = 0;
   let inBody = false;
   let skipDepth = 0;
+  let inText = false;
+  let inLink = !links;
+  // NCX의 navPoint는 중첩되므로 각 navPoint가 가리키는 경로를 쌓아 둔다
+  const navPoints: boolean[] = [];
   let active = false;
+
+  const isTarget = (href: string | undefined) => Boolean(links && href && links.targets.has(resolvePath(links.base, href)));
 
   const processText = (text: string) => {
     if (!active || !/\S/.test(text)) return text;
@@ -215,14 +236,26 @@ export function applyToMarkup(src: string, kind: 'html' | 'ncx', rules: Compiled
     const tag = TAG_NAME.exec(m[0]);
     if (!tag) continue;
     const closing = tag[1] === '/';
+    const selfClosing = m[0].endsWith('/>');
     const name = tag[2].toLowerCase();
     if (kind === 'ncx') {
-      if (name === 'text') active = !closing && !m[0].endsWith('/>');
+      if (name === 'text') inText = !closing && !selfClosing;
+      else if (links && name === 'navpoint' && !selfClosing) {
+        if (closing) navPoints.pop();
+        else {
+          // navPoint의 경로는 navLabel 뒤의 첫 <content>에 있다 (하위 navPoint는 그보다 뒤에 온다)
+          const content = /<(?:[\w-]+:)?content\b[^>]*>/gi;
+          content.lastIndex = last;
+          navPoints.push(isTarget(attrs(content.exec(src)?.[0] ?? '').src));
+        }
+      }
+      active = inText && (!links || navPoints[navPoints.length - 1] === true);
       continue;
     }
-    if (name === 'body') inBody = !closing && !m[0].endsWith('/>');
-    else if ((name === 'script' || name === 'style') && !m[0].endsWith('/>')) skipDepth = Math.max(0, skipDepth + (closing ? -1 : 1));
-    active = inBody && skipDepth === 0;
+    if (name === 'body') inBody = !closing && !selfClosing;
+    else if ((name === 'script' || name === 'style') && !selfClosing) skipDepth = Math.max(0, skipDepth + (closing ? -1 : 1));
+    else if (links && name === 'a' && !selfClosing) inLink = !closing && isTarget(attrs(m[0]).href);
+    active = inBody && skipDepth === 0 && inLink;
   }
   out.push(processText(src.slice(last)));
   return out.join('');
@@ -234,19 +267,36 @@ export function markupKind(path: string): 'html' | 'ncx' | null {
   return null;
 }
 
-/** 본문 파일에 규칙을 적용한 새 파일 목록을 돌려준다. 바뀌지 않은 파일은 원본 데이터를 그대로 쓴다. */
+/** 챕터 하나에만 적용할 때의 범위 */
+export interface EpubScope {
+  /** 챕터에 속한 본문 문서 경로 */
+  paths: string[];
+  /** 목차 문서. 이 챕터를 가리키는 항목의 글자만 바꾼다. */
+  navPath?: string;
+  ncxPath?: string;
+}
+
+/**
+ * 본문 파일에 규칙을 적용한 새 파일 목록을 돌려준다. 바뀌지 않은 파일은 원본 데이터를 그대로 쓴다.
+ * scope가 없으면 모든 XHTML과 NCX에, 있으면 그 챕터의 문서와 목차 항목에만 적용한다.
+ */
 export function applyToEpubFiles(
   files: Record<string, Uint8Array>,
   rules: CompiledRule[],
   results: RuleResult[],
   onFile?: (done: number, total: number) => void,
+  scope?: EpubScope,
 ): Record<string, Uint8Array> {
   const out = { ...files };
-  const targets = Object.keys(files).filter((p) => markupKind(p));
-  targets.forEach((path, i) => {
-    onFile?.(i, targets.length);
+  const targets = new Set(scope?.paths);
+  const tocPaths = [scope?.navPath, scope?.ncxPath].filter((p): p is string => Boolean(p && files[p]));
+  const paths = scope ? [...scope.paths.filter((p) => files[p]), ...tocPaths] : Object.keys(files).filter((p) => markupKind(p));
+  paths.forEach((path, i) => {
+    onFile?.(i, paths.length);
+    const kind = markupKind(path) ?? 'html';
+    const links = scope && tocPaths.includes(path) ? { targets, base: dirOf(path) } : undefined;
     const src = strFromU8(files[path]);
-    const changed = applyToMarkup(src, markupKind(path)!, rules, results);
+    const changed = applyToMarkup(src, kind, rules, results, links);
     if (changed !== src) out[path] = strToU8(changed);
   });
   return out;

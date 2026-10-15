@@ -1,7 +1,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { buildEpub } from './epub';
-import { htmlToText, isZip, patchEpub, readEpub } from './epubRead';
+import { htmlToText, isZip, patchEpub, readChapters, readEpub } from './epubRead';
 
 const jpeg = { data: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), width: 10, height: 15 };
 
@@ -69,6 +69,39 @@ describe('readEpub', () => {
   it('ZIP 여부를 판별한다', () => {
     expect(isZip(ownEpub())).toBe(true);
     expect(isZip(strToU8('제목\n본문'))).toBe(false);
+  });
+});
+
+describe('readChapters', () => {
+  it('목차 항목마다 챕터를 만들고, 표지처럼 목차 앞의 문서는 따로 묶는다', () => {
+    const { chapters, navPath, ncxPath } = readChapters(unzipSync(ownEpub(true)));
+    expect(chapters).toEqual([
+      { title: '(목차 앞부분)', paths: ['OEBPS/cover.xhtml'] },
+      { title: '1화 시작', paths: ['OEBPS/text/c00001.xhtml'] },
+      { title: '2화 다음', paths: ['OEBPS/text/c00002.xhtml'] },
+    ]);
+    expect(navPath).toBe('OEBPS/nav.xhtml');
+    expect(ncxPath).toBe('OEBPS/toc.ncx');
+  });
+
+  it('여러 파일로 나뉜 긴 챕터는 한 챕터로 묶는다', () => {
+    const long = Array.from({ length: 5000 }, (_, i) => `${i}번째 문단입니다. 꽤 긴 문장을 넣어서 파일이 나뉘게 합니다.`);
+    const epub = buildEpub({ title: '책', sections: [{ title: '긴 챕터', lines: long }, { title: '짧은 챕터', lines: ['끝'] }] });
+    const { chapters } = readChapters(unzipSync(epub));
+    expect(chapters[0].title).toBe('긴 챕터');
+    expect(chapters[0].paths.length).toBeGreaterThan(1);
+    expect(chapters[0].paths[1]).toBe('OEBPS/text/c00001_2.xhtml');
+    expect(chapters[1]).toEqual({ title: '짧은 챕터', paths: ['OEBPS/text/c00002.xhtml'] });
+  });
+
+  it('EPUB2의 NCX 목차와 #이 붙은 경로를 읽는다', () => {
+    const { chapters, navPath, ncxPath } = readChapters(unzipSync(foreignEpub()));
+    expect(chapters).toEqual([
+      { title: '제1화 처음', paths: ['OPS/Text/part 1.html'] },
+      { title: '제2화 끝', paths: ['OPS/Text/part2.html'] },
+    ]);
+    expect(navPath).toBeUndefined();
+    expect(ncxPath).toBe('OPS/toc.ncx');
   });
 });
 

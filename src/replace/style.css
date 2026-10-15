@@ -164,6 +164,17 @@ code,
   width: auto;
 }
 
+.chapter-field {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.chapter-field select {
+  flex: 1;
+  min-width: 0;
+  max-width: 420px;
+}
+
 .result {
   margin-top: 24px;
 }

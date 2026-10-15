@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { unzipSync } from 'fflate';
 import { decode, type Encoding } from '../decode';
-import { isZip } from '../epubRead';
+import { isZip, readChapters, type EpubChapters } from '../epubRead';
 import {
   applyToEpubFiles,
   applyToText,
@@ -17,11 +17,12 @@ import {
 
 export type WorkerRequest =
   | { type: 'load'; bytes: ArrayBuffer; encoding: Encoding }
-  | { type: 'run'; rules: RuleSpec[] };
+  /** chapter: 적용할 챕터 번호 (EPUB만, null이면 전체) */
+  | { type: 'run'; rules: RuleSpec[]; chapter: number | null };
 
 export type WorkerResponse =
   | { type: 'loaded'; kind: 'txt'; encoding: string; charCount: number; lineCount: number }
-  | { type: 'loaded'; kind: 'epub'; documentCount: number }
+  | { type: 'loaded'; kind: 'epub'; documentCount: number; chapters: { title: string; fileCount: number }[] }
   | { type: 'progress'; message: string }
   | { type: 'done'; data: Uint8Array<ArrayBuffer>; results: RuleResult[]; elapsed: number }
   | { type: 'error'; message: string; ruleIndex?: number };
@@ -31,6 +32,7 @@ declare const self: DedicatedWorkerGlobalScope;
 // 큰 파일을 매번 주고받지 않도록 읽은 결과는 워커에 보관한다
 let text: { text: string; crlf: boolean } | null = null;
 let epub: Record<string, Uint8Array> | null = null;
+let epubToc: EpubChapters = { chapters: [] };
 
 function post(msg: WorkerResponse, transfer: Transferable[] = []) {
   self.postMessage(msg, transfer);
@@ -43,7 +45,18 @@ function load(bytes: Uint8Array, encoding: Encoding) {
     const files = unzipSync(bytes);
     if (!files['META-INF/container.xml']) throw new Error('EPUB 파일이 아니거나 손상되었습니다. (container.xml 없음)');
     epub = files;
-    post({ type: 'loaded', kind: 'epub', documentCount: Object.keys(files).filter((p) => markupKind(p) === 'html').length });
+    try {
+      epubToc = readChapters(files);
+    } catch {
+      // 목차를 읽지 못해도 책 전체에는 적용할 수 있다
+      epubToc = { chapters: [] };
+    }
+    post({
+      type: 'loaded',
+      kind: 'epub',
+      documentCount: Object.keys(files).filter((p) => markupKind(p) === 'html').length,
+      chapters: epubToc.chapters.map((c) => ({ title: c.title, fileCount: c.paths.length })),
+    });
     return;
   }
   const decoded = decode(bytes, encoding);
@@ -63,7 +76,7 @@ function compile(specs: RuleSpec[]): CompiledRule[] {
   });
 }
 
-function run(specs: RuleSpec[]) {
+function run(specs: RuleSpec[], chapter: number | null) {
   const start = performance.now();
   const rules = compile(specs);
   const results = emptyResults(rules.length);
@@ -92,13 +105,17 @@ function run(specs: RuleSpec[]) {
     data = new TextEncoder().encode(out);
   } else if (epub) {
     let lastReport = 0;
+    const scope =
+      chapter === null
+        ? undefined
+        : { paths: epubToc.chapters[chapter].paths, navPath: epubToc.navPath, ncxPath: epubToc.ncxPath };
     const files = applyToEpubFiles(epub, rules, results, (done, total) => {
       // 메시지가 너무 많아지지 않게 0.1초에 한 번만 알린다
       const now = performance.now();
       if (now - lastReport < 100) return;
       lastReport = now;
       post({ type: 'progress', message: `규칙 적용 중 (${done}/${total} 문서)` });
-    });
+    }, scope);
     post({ type: 'progress', message: 'EPUB 압축하는 중...' });
     data = zipEpub(files) as Uint8Array<ArrayBuffer>;
   } else {
@@ -112,7 +129,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   const msg = e.data;
   try {
     if (msg.type === 'load') load(new Uint8Array(msg.bytes), msg.encoding);
-    else run(msg.rules);
+    else run(msg.rules, msg.chapter);
   } catch (err) {
     post({
       type: 'error',

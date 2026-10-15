@@ -28,6 +28,8 @@ const dropInfo = $('drop-info');
 const fileBar = $('file-bar');
 const fileStats = $('file-stats');
 const encodingField = $('encoding-field');
+const chapterField = $('chapter-field');
+const chapterSelect = $<HTMLSelectElement>('chapter');
 const encodingSelect = $<HTMLSelectElement>('encoding');
 const runButton = $<HTMLButtonElement>('run');
 const cancelButton = $<HTMLButtonElement>('cancel');
@@ -303,6 +305,7 @@ function updateRunButton() {
 }
 
 async function loadFile(f: File, encoding: Encoding = 'auto') {
+  if (f !== file) chapterSelect.value = 'all';
   file = f;
   fileReady = false;
   updateRunButton();
@@ -316,10 +319,25 @@ async function loadFile(f: File, encoding: Encoding = 'auto') {
 /** 실행 시점의 규칙. 결과 화면에서 몇 번째 규칙인지 보여주기 위해 원래 번호도 기억한다. */
 let ranRules: { number: number; rule: Rule }[] = [];
 let runStart = 0;
+/** 실행할 때 고른 챕터 (null이면 전체) */
+let ranChapter: number | null = null;
 let runMessage = '';
 let runTimer = 0;
 /** 파일을 다 읽은 뒤 보여줄 상태 메시지 */
 let afterLoadMessage = '';
+
+function renderChapters(chapters: { title: string; fileCount: number }[]) {
+  // 같은 파일을 다시 읽을 때(중지 후 등)는 고른 챕터를 유지한다
+  const previous = chapterSelect.value;
+  chapterSelect.innerHTML =
+    '<option value="all">책 전체</option>' +
+    chapters
+      .map((c, i) => `<option value="${i}">${i + 1}. ${escapeHtml(c.title)}${c.fileCount > 1 ? ` (파일 ${c.fileCount}개)` : ''}</option>`)
+      .join('');
+  chapterSelect.value = previous && Number(previous) < chapters.length ? previous : 'all';
+}
+
+chapterSelect.addEventListener('change', markStale);
 
 function startRun() {
   const rules = activeList().rules;
@@ -334,6 +352,7 @@ function startRun() {
     return;
   }
   ranRules = enabled.map((r) => ({ number: r.number, rule: { ...r.rule } }));
+  ranChapter = chapterField.hidden || chapterSelect.value === 'all' ? null : Number(chapterSelect.value);
   running = true;
   runStart = performance.now();
   updateRunButton();
@@ -342,7 +361,11 @@ function startRun() {
   runMessage = '규칙 적용 중';
   showRunStatus();
   runTimer = window.setInterval(showRunStatus, 200);
-  send({ type: 'run', rules: ranRules.map(({ rule }) => ({ find: rule.find, replace: rule.replace, flags: rule.flags })) });
+  send({
+    type: 'run',
+    rules: ranRules.map(({ rule }) => ({ find: rule.find, replace: rule.replace, flags: rule.flags })),
+    chapter: ranChapter,
+  });
 }
 
 function showRunStatus() {
@@ -364,6 +387,8 @@ function onWorkerMessage(e: MessageEvent<WorkerResponse>) {
       updateRunButton();
       fileBar.hidden = false;
       encodingField.hidden = msg.kind === 'epub';
+      chapterField.hidden = msg.kind !== 'epub' || !msg.chapters.length;
+      if (msg.kind === 'epub') renderChapters(msg.chapters);
       if (msg.kind === 'txt') {
         if (encodingSelect.value === 'auto') encodingSelect.options[0].textContent = `자동 감지 (${msg.encoding.toUpperCase()})`;
         fileStats.textContent = `txt · ${msg.lineCount.toLocaleString()}줄 · ${msg.charCount.toLocaleString()}자`;
@@ -447,7 +472,7 @@ function clearResult() {
 }
 
 function markStale() {
-  if (result) resultNote.textContent = '규칙이 바뀌었습니다. 다시 실행해야 반영됩니다. 다운로드는 이전 실행 결과입니다.';
+  if (result) resultNote.textContent = '규칙이나 적용 범위가 바뀌었습니다. 다시 실행해야 반영됩니다. 다운로드는 이전 실행 결과입니다.';
 }
 
 // 줄바꿈을 눈에 보이게 표시한다
@@ -465,7 +490,8 @@ function showResult(data: Uint8Array<ArrayBuffer>, results: RuleResult[], elapse
 
   const total = results.reduce((n, r) => n + r.count, 0);
   resultTitle.textContent = `결과 · ${total.toLocaleString()}곳 바뀜`;
-  resultNote.textContent = `${(elapsed / 1000).toFixed(1)}초 · ${formatSize(blob.size)}${fileStats.textContent?.startsWith('txt') ? ' · UTF-8로 저장' : ''}`;
+  const scope = ranChapter === null ? '' : ` · ${chapterSelect.options[ranChapter + 1]?.textContent ?? ''}에만 적용`;
+  resultNote.textContent = `${(elapsed / 1000).toFixed(1)}초 · ${formatSize(blob.size)}${fileStats.textContent?.startsWith('txt') ? ' · UTF-8로 저장' : ''}${scope}`;
   resultList.innerHTML = results
     .map((r, i) => {
       const { number, rule } = ranRules[i];

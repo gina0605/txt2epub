@@ -1,6 +1,7 @@
 import { strFromU8, strToU8, unzipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { buildEpub } from '../epub';
+import { readChapters } from '../epubRead';
 import {
   applyToEpubFiles,
   applyToMarkup,
@@ -149,5 +150,58 @@ describe('EPUB 적용', () => {
     const files = { 'a.xhtml': strToU8('<body>x</body>'), 'b.css': strToU8('x') };
     const out = applyToEpubFiles(files, [compileRule(rule('y', 'z'))], emptyResults(1));
     expect(out['a.xhtml']).toBe(files['a.xhtml']);
+  });
+});
+
+describe('챕터 하나에만 적용', () => {
+  const epub = () =>
+    unzipSync(
+      buildEpub({
+        title: '철수 이야기',
+        sections: [
+          { title: '1화 철수', lines: ['철수가 왔다.'] },
+          { title: '2화 철수', lines: ['철수가 갔다.'] },
+        ],
+      }),
+    );
+
+  it('그 챕터의 본문과 목차 항목만 바꾼다', () => {
+    const files = epub();
+    const { chapters, navPath, ncxPath } = readChapters(files);
+    const results = emptyResults(1);
+    const out = applyToEpubFiles(files, [compileRule(rule('철수', '민수'))], results, undefined, {
+      paths: chapters[1].paths,
+      navPath,
+      ncxPath,
+    });
+    const text = (p: string) => strFromU8(out[p]);
+
+    expect(text('OEBPS/text/c00001.xhtml')).toContain('<p>철수가 왔다.</p>');
+    expect(text('OEBPS/text/c00002.xhtml')).toContain('<h2>2화 민수</h2>');
+    expect(text('OEBPS/text/c00002.xhtml')).toContain('<p>민수가 갔다.</p>');
+    expect(text('OEBPS/nav.xhtml')).toContain('<a href="text/c00001.xhtml">1화 철수</a>');
+    expect(text('OEBPS/nav.xhtml')).toContain('<a href="text/c00002.xhtml">2화 민수</a>');
+    expect(text('OEBPS/toc.ncx')).toContain('<docTitle><text>철수 이야기</text></docTitle>');
+    expect(text('OEBPS/toc.ncx')).toContain('<text>1화 철수</text>');
+    expect(text('OEBPS/toc.ncx')).toContain('<text>2화 민수</text>');
+    // 본문 h2, 본문 1줄, nav, ncx
+    expect(results[0].count).toBe(4);
+  });
+
+  it('중첩된 navPoint는 각자 가리키는 경로로 판단한다', () => {
+    const ncx =
+      '<ncx><docTitle><text>a</text></docTitle><navMap>' +
+      '<navPoint><navLabel><text>a 1부</text></navLabel><content src="t/p1.xhtml"/>' +
+      '<navPoint><navLabel><text>a 1화</text></navLabel><content src="t/c1.xhtml#x"/></navPoint>' +
+      '<navPoint><navLabel><text>a 2화</text></navLabel><content src="t/c2.xhtml"/></navPoint>' +
+      '</navPoint></navMap></ncx>';
+    const out = applyToMarkup(ncx, 'ncx', [compileRule(rule('a', 'b'))], emptyResults(1), {
+      targets: new Set(['OPS/t/c1.xhtml']),
+      base: 'OPS/',
+    });
+    expect(out).toContain('<docTitle><text>a</text>');
+    expect(out).toContain('<text>a 1부</text>');
+    expect(out).toContain('<text>b 1화</text>');
+    expect(out).toContain('<text>a 2화</text>');
   });
 });

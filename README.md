@@ -20,6 +20,7 @@ txt·epub 파일의 글자를 정규식 규칙 목록으로 한꺼번에 바꾼�
 - 규칙 목록을 여러 개 만들어 브라우저(localStorage)에 자동 저장, JSON 파일로 내보내기/가져오기
 - 규칙별 바뀐 개수와 예시 표시
 - txt는 UTF-8로 저장 (줄바꿈 방식은 원본 유지), EPUB은 본문·목차의 글자만 바꾸고 태그·서식·이미지는 유지
+- EPUB은 적용 범위를 목차 기준 챕터 하나로 좁힐 수 있음 (그 챕터의 본문과 목차 속 제목만 바뀜)
 - Web Worker에서 처리하므로 수십 MB 파일이나 오래 걸리는 정규식에도 화면이 멈추지 않고, 중지할 수 있음
 
 ## 개발
@@ -49,7 +50,7 @@ npm run build    # dist/ 생성
 | `src/decode.ts` | 인코딩 감지 및 디코딩 |
 | `src/parse.ts` | 제목·챕터 인식, 챕터별 본문 분리 |
 | `src/epub.ts` | EPUB 파일 생성 (fflate) |
-| `src/epubRead.ts` | EPUB 읽기 (텍스트·목차·표지 추출), 원본 유지 수정 |
+| `src/epubRead.ts` | EPUB 읽기 (텍스트·목차·표지·챕터별 파일 추출), 원본 유지 수정 |
 | `src/cover.ts` | 표지 이미지 리사이즈/JPEG 변환 |
 | `src/worker.ts` | 무거운 작업을 처리하는 Web Worker |
 | `src/main.ts` | 화면 |

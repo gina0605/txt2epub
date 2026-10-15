@@ -50,6 +50,8 @@
               <code>i</code>는 대소문자 무시, <code>s</code>는 <code>.</code>이 줄바꿈도 포함하게 합니다.</li>
             <li>바꿀 내용에서 <code>$1</code>, <code>$&lt;이름&gt;</code>, <code>$&amp;</code>(매치 전체), <code>$$</code>(<code>$</code> 문자)를 쓸 수 있습니다.
               <code>\n</code>은 줄바꿈, <code>\t</code>는 탭, <code>\\</code>는 역슬래시입니다.</li>
+            <li>EPUB은 적용 범위를 챕터 하나로 좁힐 수 있습니다. 그 챕터의 본문과 목차 속 그 챕터의 제목만 바뀝니다.
+              챕터는 목차 기준이며, 파일 하나를 목차가 여러 곳으로 나눠 가리키면 그 파일 전체가 첫 번째 챕터로 묶입니다.</li>
             <li>EPUB은 본문과 목차의 글자만 바꾸고 태그·서식·이미지는 그대로 둡니다. 다만 <code>&lt;b&gt;</code> 같은 태그로 나뉜 글자에 걸친 매치는 찾지 못합니다.</li>
             <li>목록은 이 브라우저에 자동 저장됩니다. 사이트 데이터를 지우거나 사생활 보호 모드를 쓰면 사라질 수 있고,
               Safari는 7일 이상 방문하지 않은 사이트의 저장 데이터를 지우기도 합니다. 중요한 목록은 파일로 내보내 두세요.</li>
@@ -65,6 +67,10 @@
 
       <div id="file-bar" class="file-bar" hidden>
         <span id="file-stats" class="muted"></span>
+        <label id="chapter-field" class="inline-field chapter-field" hidden
+          >적용 범위
+          <select id="chapter"></select>
+        </label>
         <label id="encoding-field" class="inline-field"
           >인코딩
           <select id="encoding">
